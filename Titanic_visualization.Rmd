@@ -1,0 +1,70 @@
+---
+title: "Who Survived the Titanic?"
+author: "Zane Billings"
+date: "5 December, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+if (require('here')==FALSE) {install.packages('here', repos="https://cran.rstudio.com")} else {require('here')}
+knitr::opts_chunk$set(echo = TRUE)
+
+if (require('tidyverse')==FALSE) {install.packages('tidyverse', repos="https://cran.rstudio.com")} else {require('tidyverse')}
+knitr::opts_chunk$set(echo = TRUE)
+
+source(here("data_cleanup.R"), echo = FALSE)
+titanic <- readRDS("titanic.Rda")
+```
+
+The Titanic disaster in 1912 claimed over a thousand lives. We have `r nrow(titanic)` of those represented in data (of whom `r fct_count(titanic$survived)[2, 2]` survived the crash), including information about their age, passenger class, sex, fare, and more, even including their names.
+
+Having access to these data raises an interesting question: who on board the Titanic was more likely to survive?
+
+## Women were more likely to survive.
+
+One of the first records to examine is the sex of the passenger: was either sex more or less likely to survive the disaster? First, we look at how many passengers of each sex were on board, and then examine the number of survivors of each sex. Notably, there were `r sum(is.na(titanic$sex))` missing records in the sex field, which were excluded.
+```{r Sex Distribution}
+titanic %>% 
+  drop_na(sex) %>% 
+  group_by(sex) %>% 
+  summarize("num" = n()) %>% 
+  ggplot(aes(x = sex, y = num, fill = sex)) +
+  geom_col() +
+  labs(x = "Sex", y = "Number of passengers") + 
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+```{r Sex Prop}
+titanic %>% 
+  drop_na(sex) %>%
+  group_by(sex, survived) %>% 
+  summarize("num" = n()) %>% 
+  ungroup(survived) %>% 
+  mutate(prop_surv = num / sum(num) * 100) %>% 
+  filter(survived == "Survived") %>% 
+  ggplot(aes(x = sex, y = prop_surv, fill = sex)) +
+  geom_col() +
+  labs(x = "Sex", y = "Percent survived") + 
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+So, we see that although there were twice as many men as women on board the Titanic, the survival rate of women was much higher. For an alternative (flashier) view, we can make a stacked bar chart instead.
+
+```{r Stacked Sex Chart}
+titanic %>% 
+  drop_na(sex) %>% 
+  group_by(sex, survived) %>% 
+  summarize("num" = n()) %>% 
+  ggplot(aes(x = sex, y = num, fill = survived)) +
+  geom_col() +
+  labs(x = "Sex", y = "Number of passengers", fill = NULL) + 
+  theme_minimal()
+```
+
+## Upper class passengers were more likely to survive.
+
+## These two trends are confounded!
