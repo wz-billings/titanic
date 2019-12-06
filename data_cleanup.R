@@ -13,9 +13,13 @@ titanic <- read_excel("titanic_data.xlsx")
 titanic <- titanic %>% 
   mutate(keyno = as.character(keyno),
          pclass = as.factor(pclass),
-         survived = as.factor(survived),
+         n_surv = survived, # proxy to have a numeric version of this.
+         survived = as.factor(survived), # used for good labels!
          sex = as.factor(sex),
-         embarked = as.factor(embarked))
+         embarked = as.factor(embarked),
+         sibsp = as.integer(sibsp),
+         parch = as.integer(parch),
+         famsize = sibsp + parch)
 
 # Relabel factors to make them more useful.
 titanic <- titanic %>% 

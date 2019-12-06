@@ -15,7 +15,7 @@ if (require('tidyverse')==FALSE) {install.packages('tidyverse', repos="https://c
 knitr::opts_chunk$set(echo = TRUE)
 
 source(here("data_cleanup.R"), echo = FALSE)
-titanic <- readRDS("titanic.Rda")
+titanic <- readRDS(here("titanic.Rda"))
 ```
 
 The Titanic disaster in 1912 claimed over a thousand lives. We have `r nrow(titanic)` of those represented in data (of whom `r fct_count(titanic$survived)[2, 2]` survived the crash), including information about their age, passenger class, sex, fare, and more, even including their names.
@@ -40,12 +40,9 @@ titanic %>%
 ```{r Sex Prop}
 titanic %>% 
   drop_na(sex) %>%
-  group_by(sex, survived) %>% 
-  summarize("num" = n()) %>% 
-  ungroup(survived) %>% 
-  mutate(prop_surv = num / sum(num) * 100) %>% 
-  filter(survived == "Survived") %>% 
-  ggplot(aes(x = sex, y = prop_surv, fill = sex)) +
+  group_by(sex) %>%
+  summarize("num" = n(), "surv" = mean(n_surv)) %>% 
+  ggplot(aes(x = sex, y = surv, fill = sex)) + 
   geom_col() +
   labs(x = "Sex", y = "Percent survived") + 
   theme_minimal() +
@@ -67,4 +64,117 @@ titanic %>%
 
 ## Upper class passengers were more likely to survive.
 
+Another question to ask is whether first-class passengers were more likely to survive. First, we can see that although the majority of passengers were third class, many more third class passengers died.
+
+```{r Class Chart}
+titanic %>% 
+  drop_na(pclass) %>% 
+  group_by(pclass, survived) %>% 
+  summarize("num" = n()) %>% 
+  ggplot(aes(x = pclass, y = num, fill = survived)) +
+  geom_col() +
+  labs(x = "Passenger Class", y = "Number of passengers", fill = NULL) + 
+  theme_minimal()
+```
+
+In order to examine this trend more closely, we can look at the survival percentage for each class like we did with the passenger sex.
+
+```{r PClass Prop}
+titanic %>% 
+  drop_na(pclass) %>%
+  group_by(pclass) %>%
+  summarize("num" = n(), "surv" = mean(n_surv)) %>% 
+  ggplot(aes(x = pclass, y = surv, fill = pclass)) + 
+  geom_col() +
+  labs(x = "Passenger Class", y = "Percent survived") + 
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
 ## These two trends are confounded!
+
+Now that we know first class passengers and women were both more likely to survive, we might ask: are first-class women specifically more likely to survive? We can visualize this by stratifying the last plot we made.
+
+```{r Confounding}
+titanic %>% 
+  drop_na(pclass) %>%
+  group_by(pclass, sex) %>%
+  summarize("num" = n(), "surv" = mean(n_surv)) %>% 
+  ggplot(aes(x = pclass, y = surv, fill = sex)) +
+  geom_col(position = "dodge") +
+  labs(x = "Passenger Class", y = "Percent survived", fill = "Sex") + 
+  theme_minimal()
+```
+
+Very interestingly, we see that the vast majority of first-class (and to a similar extent second-class) women survived the Titanic disaster.
+
+## Large families had lower survival overall.
+
+Two variables about family size were recorded: the number of (combined) siblings and spouses of each passenger, and the combined number of parents and children of each passenger. I additionally took the liberty of calculating a family size variable, which is the sum of these two fields.
+
+Looking only at the number of siblings and spouses, we see that passengers with only one (either one sibling or one spouse, but not both) were more likely to survive, but passengers with a high amount (i.e. greater than three) did not have a very high survival rate.
+
+```{r SibSp Plot}
+titanic %>%
+  mutate(sibsp = as.factor(sibsp)) %>% 
+  drop_na(sibsp) %>%
+  group_by(sibsp) %>%
+  summarize("num" = n(), "surv" = mean(n_surv)) %>%
+  ggplot(aes(x = sibsp, y = surv, fill = sibsp)) + 
+  geom_col() +
+  labs(x = "No. siblings and spouses", y = "Percent survived") + 
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+Similarly, looking at the combined total of parents and children, we see that passengers with a total greater than three appear to be much less likely to survive.
+
+```{r Parch Plot}
+titanic %>% 
+  mutate(parch = as.factor(parch)) %>% 
+  drop_na(parch) %>%
+  group_by(parch) %>%
+  summarize("num" = n(), "surv" = mean(n_surv)) %>% 
+  ggplot(aes(x = parch, y = surv, fill = parch)) + 
+  geom_col() +
+  labs(x = "No. Parents and Children", y = "Percent survived") + 
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+So, it should be no surprise that if we examine the survival distribution based on total family size, passengers with a family size greater than three tended not to survive. However, we also see a lower survival rate in passengers with a family size of zero, which is somewhat unexpected.
+
+```{r Famsize Plot}
+titanic %>% 
+  mutate(famsize = as.factor(famsize)) %>% 
+  drop_na(famsize) %>%
+  group_by(famsize) %>%
+  summarize("num" = n(), "surv" = mean(n_surv)) %>% 
+  ggplot(aes(x = famsize, y = surv, fill = famsize)) + 
+  geom_col() +
+  labs(x = "Family Size (Parents, children, siblings, and spouses)", y = "Percent survived") + 
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+Now, why would it be the case that large families tended to survive less?
+
+```{r FamSize Pclass Plot}
+titanic %>% 
+  mutate(famsize = as.factor(famsize)) %>% 
+  drop_na(famsize, pclass) %>%
+  group_by(famsize, pclass) %>%
+  summarize("num" = n(), "surv" = mean(n_surv)) %>% 
+  ggplot(aes(x = famsize, y = num, fill = famsize)) + 
+  geom_col() +
+  facet_wrap(~pclass, scales = "free") + 
+  labs(x = "Family Size", y = "Number of records") + 
+  theme_minimal() + 
+  theme(legend.position = "none")
+```
+
+Well, maybe this helps to explain it...the vast majority of passengers with large families or with no other family members on board were third class passengers, and we already saw that third class passengers had a much lower survival rate.
+
+## Final Conclusions.
+
+So, from the Titanic data, what we have seen is that first-class women with moderate family sizes were likely to have the highest survival rates. The fact that more women were saved, and passengers with a moderate family size were saved, likely reflects the "save women and children first" policy that most people are familiar with. And furthermore, it seems that even with respect to the Titanic disaster, money talks.
